@@ -77,7 +77,7 @@ export default function BookingFlow({ salon, dates, siteKey }) {
   }
 
   if (step === 'done') {
-    return <Confirmation salon={salon} service={service} slot={slot} result={result}
+    return <Confirmation salon={salon} service={service} slot={slot} result={result} onUpdate={(u) => setResult({ ...result, ...u })}
       stylist={staffName(result.staffId)} onChange={() => { setStep('pick'); loadSlots({}); }} />;
   }
 
@@ -196,7 +196,7 @@ function Details({ salon, service, slot, stylist, siteKey, busy, onSubmit }) {
   );
 }
 
-function Confirmation({ salon, service, slot, result, stylist, onChange }) {
+function Confirmation({ salon, service, slot, result, stylist, onChange, onUpdate }) {
   const [copied, setCopied] = useState(false);
   const link = `${window.location.origin}/booking/${result.manageToken}`;
   const held = result.status === 'held';
@@ -212,17 +212,13 @@ function Confirmation({ salon, service, slot, result, stylist, onChange }) {
         {stylist && <><dt className="text-muted">Stylist</dt><dd>{stylist}</dd></>}
         <dt className="text-muted">Price</dt>
         <dd>{result.deposit
-          ? `${formatRupees(result.deposit)} now, ${formatRupees(service.price_paise - result.deposit)} at the salon`
+          ? `${formatRupees(result.deposit)} ${result.paid ? 'paid' : 'now'}, ${formatRupees(service.price_paise - result.deposit)} at the salon`
           : `${formatRupees(service.price_paise)} at the salon`}
           <span className="hint block">{result.depositReason}</span>
         </dd>
       </dl>
 
-      {held && (
-        <p className="rounded-lg bg-brand-soft p-3 text-sm">
-          Held until {formatTime(result.holdExpiresAt, tz)}. Online UPI deposit payment is coming soon.
-        </p>
-      )}
+      {held && <PayDeposit result={result} tz={tz} onUpdate={onUpdate} />}
       {salon.customer_note && <p className="rounded-lg bg-paper p-3 text-sm">{salon.customer_note}</p>}
 
       <div>
@@ -237,5 +233,52 @@ function Confirmation({ salon, service, slot, result, stylist, onChange }) {
       </div>
       {held && <button className="hint underline" onClick={onChange}>Pick a different time</button>}
     </section>
+  );
+}
+
+// Razorpay Checkout (test mode: UPI id success@razorpay). The webhook confirms the
+// payment too, so closing the tab after paying still books the slot.
+function PayDeposit({ result, tz, onUpdate }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    .then(async (res) => ({ ok: res.ok, body: await res.json().catch(() => ({ message: 'Something went wrong.' })) }));
+
+  async function pay() {
+    setBusy(true);
+    setMessage('');
+    const order = await post('/api/payments/order', { bookingId: result.bookingId, holdKey: holdKey() });
+    if (!order.ok || !window.Razorpay) {
+      setBusy(false);
+      setMessage(order.body.message ?? 'Payment couldn’t start. Please try again.');
+      return;
+    }
+    const o = order.body;
+    onUpdate({ holdExpiresAt: o.holdExpiresAt });
+    const checkout = new window.Razorpay({
+      key: o.keyId, order_id: o.orderId, amount: o.amount, currency: 'INR',
+      name: o.salonName, description: o.description, prefill: o.prefill, theme: { color: '#7a2e4d' },
+      handler: async (r) => {
+        const v = await post('/api/payments/verify',
+          { orderId: r.razorpay_order_id, paymentId: r.razorpay_payment_id, signature: r.razorpay_signature });
+        setBusy(false);
+        if (v.ok && v.body.status === 'confirmed') onUpdate({ status: 'confirmed', paid: true });
+        else setMessage(v.body.message);
+      },
+      modal: { ondismiss: () => setBusy(false) },
+    });
+    checkout.on('payment.failed', (r) => setMessage(r.error?.description || 'Payment failed. You can try again.'));
+    checkout.open();
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg bg-brand-soft p-3 text-sm">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
+      <p>Held until {formatTime(result.holdExpiresAt, tz)}. Pay the deposit to confirm your slot.</p>
+      {message && <p role="alert" className="text-red-800">{message}</p>}
+      <button className="btn w-full" onClick={pay} disabled={busy}>
+        {busy ? 'Opening payment…' : `Pay ${formatRupees(result.deposit)} deposit`}
+      </button>
+    </div>
   );
 }
