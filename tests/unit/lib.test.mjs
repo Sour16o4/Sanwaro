@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { rupeesToPaise, formatRupees } from '../../lib/money.js';
 import { localToUtc, formatDateTime } from '../../lib/time.js';
+import { createHmac } from 'node:crypto';
+import { checkoutSignatureOk, webhookSignatureOk } from '../../lib/razorpay.js';
 
 test('rupeesToPaise parses rupee strings without floats', () => {
   assert.equal(rupeesToPaise('199.99'), 19999);
@@ -55,4 +57,23 @@ test('toHttp maps named SQL errors and hides everything else', () => {
   assert.equal(unknown.status, 500);
   assert.equal(unknown.body.message, 'Something went wrong.');
   assert.doesNotMatch(JSON.stringify(unknown.body), /duplicate key/);
+});
+
+test('Razorpay signatures: right secret passes, anything else fails', () => {
+  process.env.RAZORPAY_KEY_SECRET = 'key-secret';
+  process.env.RAZORPAY_WEBHOOK_SECRET = 'hook-secret';
+  const sign = (secret, data) => createHmac('sha256', secret).update(data).digest('hex');
+
+  assert.ok(checkoutSignatureOk('order_1', 'pay_1', sign('key-secret', 'order_1|pay_1')));
+  assert.ok(!checkoutSignatureOk('order_1', 'pay_2', sign('key-secret', 'order_1|pay_1')));   // swapped payment
+  assert.ok(!checkoutSignatureOk('order_1', 'pay_1', sign('hook-secret', 'order_1|pay_1')));  // wrong secret
+  assert.ok(!checkoutSignatureOk('order_1', 'pay_1', undefined));
+
+  const body = '{"event":"payment.captured","amount":30000}';
+  assert.ok(webhookSignatureOk(body, sign('hook-secret', body)));
+  assert.ok(!webhookSignatureOk(body.replace('30000', '3'), sign('hook-secret', body)));     // tampered body
+  assert.ok(!webhookSignatureOk(body, 'short'));
+
+  delete process.env.RAZORPAY_WEBHOOK_SECRET;                                                 // unset = always refuse
+  assert.ok(!webhookSignatureOk(body, sign('', body)));
 });

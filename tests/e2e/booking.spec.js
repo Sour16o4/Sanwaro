@@ -69,6 +69,7 @@ test('a deposit service is held and shows the split', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Your slot is held' })).toBeVisible();
   await expect(page.getByText('₹300 now, ₹1,200 at the salon')).toBeVisible();
   await expect(page.getByText('A small deposit holds your slot')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pay ₹300 deposit' })).toBeVisible();
 });
 
 test('two browsers click the same slot: exactly one wins', async ({ browser }) => {
