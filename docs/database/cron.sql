@@ -38,6 +38,17 @@ select cron.schedule('auto-complete', '7 * * * *',
 select cron.schedule('release-walkins', '*/5 * * * *',
   $$ select public.release_stale_walkins(); $$);
 
+-- 3d. Daily 04:23 UTC: retry failed refunds and pay back in-time cancellations.
+select cron.schedule('refund-sweep', '23 4 * * *', $$
+  select net.http_post(
+    url     := (select value from private.app_config where key = 'app_url') || '/api/payments/sweep',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'x-notify-secret', (select value from private.app_config where key = 'notify_secret')),
+    body    := '{}'::jsonb
+  );
+$$);
+
 -- 4. Daily 03:17 UTC: clean the rate-limiter table (keeps the free 500 MB database small).
 select cron.schedule('cleanup-rate-events', '17 3 * * *',
   $$ select public.cleanup_rate_events(); $$);
