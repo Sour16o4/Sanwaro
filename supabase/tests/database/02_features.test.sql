@@ -95,16 +95,16 @@ from customers c,
              ('Bina', interval '2 hours', 'walkin', now() - interval '2 hours')) v(staff, ago, source, started)
 where c.phone = '9000000028';
 
-select is(auto_complete_bookings(), 1, '57 one forgotten visit auto-completed');
-select is((select status from bookings where source = 'online' and slot && tstzrange(now() - interval '6 hours', now())),
+select ok(auto_complete_bookings() >= 1, '57 auto-complete job runs');
+select is((select status from bookings where business_id = :'biz_a' and source = 'online' and slot && tstzrange(now() - interval '6 hours', now())),
           'completed', '57 visit that ended 3+ h ago is completed');
 update bookings set status = 'no_show'
-where source = 'online' and slot && tstzrange(now() - interval '6 hours', now());
+where business_id = :'biz_a' and source = 'online' and slot && tstzrange(now() - interval '6 hours', now());
 select is((select no_show_count from customers where phone = '9000000028'), 1,
           '57 owner can correct completed -> no-show');
 
-select is(release_stale_walkins(), 1, '58 walk-in who never started is released');
-select is((select count(*) from bookings where source = 'walkin' and status = 'confirmed'), 1::bigint,
+select ok(release_stale_walkins() >= 1, '58 walk-in who never started is released');
+select is((select count(*) from bookings where business_id = :'biz_a' and source = 'walkin' and status = 'confirmed'), 1::bigint,
           '58 a started walk-in is kept');
 
 -- 47-51, 59 walk-in queue ------------------------------------------------------------------
@@ -176,7 +176,7 @@ select throws_ok(format($$ insert into staff (business_id, name) values (%L, 'Sp
                  '42501', null, '60 viewer cannot insert');
 reset role;
 select is((select count(*) from businesses where name = 'Vandalised'), 0::bigint, '60 viewer cannot rename the salon');
-select is((select count(*) from customers where blocked), 0::bigint, '60 viewer cannot block customers');
+select is((select count(*) from customers where business_id = :'biz_a' and blocked), 0::bigint, '60 viewer cannot block customers');
 select is((select count(*) from staff where business_id = :'biz_a'), 2::bigint, '60 viewer cannot delete staff');
 select ok((select count(*) from bookings where business_id = :'biz_a' and status = 'held') > 0,
           '60 viewer cannot cancel bookings');

@@ -1,5 +1,5 @@
 -- Shared test data, included by every *.test.sql (\ir fixture.psql).
--- Two salons: A (glow-salon: Ravi, Bina) and B (other-salon: Bob).
+-- Two salons: A (pgtap-salon-a: Ravi, Bina) and B (pgtap-salon-b: Bob).
 -- Everyone works 10:00-13:00 and 14:00-19:00 IST, every day.
 set client_min_messages = warning;
 create extension if not exists pgtap with schema extensions;
@@ -12,34 +12,36 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000a9', 'viewer_a@test');
 
 insert into businesses (id, name, slug) values
-  ('00000000-0000-0000-0000-00000000aaaa', 'Glow Salon',  'glow-salon'),
-  ('00000000-0000-0000-0000-00000000bbbb', 'Other Salon', 'other-salon');
+  ('00000000-0000-0000-0000-00000000aaaa', 'Glow Salon',  'pgtap-salon-a'),
+  ('00000000-0000-0000-0000-00000000bbbb', 'Other Salon', 'pgtap-salon-b');
 
 insert into staff (business_id, name)
 select b.id, s.name from businesses b
-join (values ('glow-salon', 'Ravi'), ('glow-salon', 'Bina'), ('other-salon', 'Bob')) s(slug, name)
+join (values ('pgtap-salon-a', 'Ravi'), ('pgtap-salon-a', 'Bina'), ('pgtap-salon-b', 'Bob')) s(slug, name)
   on s.slug = b.slug;
 
 insert into services (business_id, name, duration_min, price_paise, deposit_paise)
 select b.id, s.name, s.dur, s.price, s.dep from businesses b
-join (values ('glow-salon',  'Haircut',      40, 30000, 10000),
-             ('glow-salon',  'Pay at salon', 30, 20000,     0),
-             ('other-salon', 'Shave',        20, 10000,  5000)) s(slug, name, dur, price, dep)
+join (values ('pgtap-salon-a',  'Haircut',      40, 30000, 10000),
+             ('pgtap-salon-a',  'Pay at salon', 30, 20000,     0),
+             ('pgtap-salon-b', 'Shave',        20, 10000,  5000)) s(slug, name, dur, price, dep)
   on s.slug = b.slug;
 
 insert into staff_services (business_id, staff_id, service_id)
-select st.business_id, st.id, sv.id from staff st join services sv on sv.business_id = st.business_id;
+select st.business_id, st.id, sv.id from staff st join services sv on sv.business_id = st.business_id
+where st.business_id in ('00000000-0000-0000-0000-00000000aaaa', '00000000-0000-0000-0000-00000000bbbb');
 
 insert into working_hours (business_id, staff_id, weekday, start_time, end_time)
 select st.business_id, st.id, d, w.s, w.e from staff st
 cross join generate_series(0, 6) d
-cross join (values (time '10:00', time '13:00'), (time '14:00', time '19:00')) w(s, e);
+cross join (values (time '10:00', time '13:00'), (time '14:00', time '19:00')) w(s, e)
+where st.business_id in ('00000000-0000-0000-0000-00000000aaaa', '00000000-0000-0000-0000-00000000bbbb');
 
 insert into memberships (user_id, business_id, role, staff_id) values
   ('00000000-0000-0000-0000-0000000000a0', '00000000-0000-0000-0000-00000000aaaa', 'owner',  null),
   ('00000000-0000-0000-0000-0000000000b0', '00000000-0000-0000-0000-00000000bbbb', 'owner',  null),
   ('00000000-0000-0000-0000-0000000000a5', '00000000-0000-0000-0000-00000000aaaa', 'staff',
-     (select id from staff where name = 'Bina')),
+     (select id from staff where name = 'Bina' and business_id = '00000000-0000-0000-0000-00000000aaaa')),
   ('00000000-0000-0000-0000-0000000000a9', '00000000-0000-0000-0000-00000000aaaa', 'viewer', null);
 
 \set owner_a  '00000000-0000-0000-0000-0000000000a0'
@@ -49,11 +51,11 @@ insert into memberships (user_id, business_id, role, staff_id) values
 \set biz_a    '00000000-0000-0000-0000-00000000aaaa'
 \set biz_b    '00000000-0000-0000-0000-00000000bbbb'
 
--- ids by name (names are unique across the fixture)
+-- ids by name (unique within the test salons; ignores any local dev data)
 create function pg_temp.sid(n text) returns uuid language sql as
-  $$ select id from public.staff where name = n $$;
+  $$ select id from public.staff where name = n and business_id::text like '00000000-0000-0000-0000-00000000%' $$;
 create function pg_temp.svc(n text) returns uuid language sql as
-  $$ select id from public.services where name = n $$;
+  $$ select id from public.services where name = n and business_id::text like '00000000-0000-0000-0000-00000000%' $$;
 
 -- local IST time `days` from today, e.g. pg_temp.at(1, '10:00') = tomorrow 10:00 IST
 create function pg_temp.at(days int, t time) returns timestamptz language sql as
