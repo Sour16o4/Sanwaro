@@ -2,20 +2,30 @@
   "name": "sanwaro",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test:db": "supabase test db",
-    "test:race": "node --test tests/db/race.test.mjs"
+    "test:race": "node --test tests/db/race.test.mjs",
+    "test:unit": "TZ=UTC node --test tests/unit/lib.test.mjs",
+    "test:e2e": "playwright test",
+    "test:api": "node --test tests/api/booking.test.mjs",
+    "demo:reset": "node --env-file=.env.local scripts/demo-reset.mjs demo@sanwaro.test"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
     "next": "16.4.2",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/turbopack": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
