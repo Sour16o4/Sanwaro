@@ -181,20 +181,21 @@ Each slice ends with something **deployed and demo-able**, so you always have a 
 **Done when:** `supabase test db` is green; the race test shows 50 → 1; the guard test (61) is green.
 
 **Phase 2 — Owner sign-in and setup (M)**
-- [ ] Google sign-in, `@supabase/ssr`, middleware for `/dashboard`
-- [ ] Onboarding → `create_business()`; setup pages (services, staff, hours, time off, policies, customer note)
+- [x] Google sign-in, `@supabase/ssr`, middleware for `/dashboard` *(2026-10-22: Next.js 16 renamed middleware to `proxy.js`; email + password works locally, Google needs the OAuth client from Google Cloud)*
+- [x] Onboarding → `create_business()`; setup pages (services, staff, hours, time off, policies, customer note) *(E2E: `tests/e2e/onboarding.spec.js`)*
 **Done when:** a new owner sets up a salon in under 5 minutes; salon B sees nothing of salon A.
 
 **Phase 3 — Booking page (L), with deposits set to ₹0 for now**
-- [ ] `/b/[slug]`, `GET /api/slots`, `POST /api/hold` (Turnstile, honeypot, phone + IP limits, browser `holdKey`)
-- [ ] "Any available" stylist: try the next stylist on `SLOT_TAKEN`
-- [ ] Confirmation screen with the manage link + copy button; IST display everywhere
+- [x] `/b/[slug]`, `GET /api/slots`, `POST /api/hold` (Turnstile, honeypot, phone + IP limits, browser `holdKey`) *(2026-10-22; API tests: `tests/api/booking.test.mjs`)*
+- [x] "Any available" stylist: try the next stylist on `SLOT_TAKEN`
+- [x] Confirmation screen with the manage link + copy button; IST display everywhere *(read-only `/booking/[token]` added now so the link works; cancel comes in Phase 7)*
 **Done when:** two browsers clicking one slot never both win; a bot without Turnstile is rejected.
 
 **Phase 4 — Owner dashboard (M)**
-- [ ] Today view per staff, bookings list, completed / no-show / cancel, phone bookings
-- [ ] Customers: history, notes, **trusted**, block
-- [ ] Demo **viewer** account + seed data; deploy
+- [x] Today view per staff, bookings list, completed / no-show / cancel, phone bookings
+- [x] Customers: history, notes, **trusted**, block
+- [x] Demo **viewer** account + seed data (`scripts/demo-reset.mjs`)
+- [ ] Deploy to Vercel
 **Done when:** you can run a day from the dashboard. 🎉 **Slice A is live.** Put it on your resume now as "in progress".
 
 ### Slice B — Deposits
