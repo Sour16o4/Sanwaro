@@ -200,11 +200,12 @@ Each slice ends with something **deployed and demo-able**, so you always have a 
 
 ### Slice B — Deposits
 **Phase 5 — Payments + smart deposit (L)**
-- [ ] `POST /api/payments/order` → `start_payment()` (≥ 3 min check, one extension) → Razorpay order → Checkout
-- [ ] `/api/payments/verify` (checkout signature) + `/api/payments/webhook` (raw-body signature) → `confirm_payment()`; refunds → `mark_refunded()`; daily sweep of `refund_pending`
+- [x] `POST /api/payments/order` → `start_payment()` (≥ 3 min check, one extension) → Razorpay order → Checkout
+- [x] `/api/payments/verify` (checkout signature) + `/api/payments/webhook` (raw-body signature) → `confirm_payment()`; refunds → `mark_refunded()`; daily sweep of `refund_pending` (`/api/payments/sweep`)
 - [ ] Webhook URL = **production** domain (Vercel protects preview deployments)
-- [ ] Smart-deposit line on the page ("Half deposit: thanks for coming back!")
-- [ ] pg_cron: `expire_stale_holds` (every minute), `auto_complete_bookings` (hourly)
+- [x] Smart-deposit line on the page ("Half deposit: thanks for coming back!")
+- [ ] pg_cron: `expire_stale_holds` (every minute), `auto_complete_bookings` (hourly): in `cron.sql`, apply after deploy
+- [ ] Real test-mode run with Razorpay keys (UPI `success@razorpay` / `failure@razorpay`)
 **Done when:** test UPI success/failure both behave; duplicate webhooks change nothing; late payment for a taken slot ends `refunded`.
 
 ### Slice C — Walk-ins
